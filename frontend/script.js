@@ -1,17 +1,13 @@
-const fitnessForm = document.getElementById('fitnessForm');
-if (fitnessForm) fitnessForm.addEventListener('submit', async function(e) {
+document.getElementById('fitnessForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
     // 1. UI References
     const loader = document.getElementById('loader');
     const results = document.getElementById('results');
     const btn = document.getElementById('generateBtn');
-    const aiOutput = document.getElementById('ai-output');
-    const errorBox = document.getElementById('generation-error');
 
     // 2. Reset UI
     results.classList.add('hidden');
-    if (errorBox) errorBox.remove();
     loader.classList.remove('hidden');
     btn.disabled = true;
 
@@ -37,10 +33,6 @@ if (fitnessForm) fitnessForm.addEventListener('submit', async function(e) {
 
         const data = await response.json();
 
-        if (!response.ok || data.status !== 'success') {
-            throw new Error(data.message || data.error || `Request failed (${response.status})`);
-        }
-
         if (data.status === 'success') {
             // 5. Populate Stats
             document.getElementById('res-bmi').innerText = data.bmi;
@@ -56,14 +48,7 @@ if (fitnessForm) fitnessForm.addEventListener('submit', async function(e) {
 
             // 6. INJECT HTML (No Markdown parsing needed anymore!)
             // The backend now sends a perfect HTML string with tables already built.
-            if (typeof data.ai_plan !== 'string' || !data.ai_plan.trim()) {
-                throw new Error('The AI service returned an empty plan. Please try again.');
-            }
-            if (/Error generating personalized plan|plan could not be generated/i.test(data.ai_plan)) {
-                const message = data.ai_plan.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-                throw new Error(message || 'The AI service could not generate a plan.');
-            }
-            aiOutput.innerHTML = data.ai_plan;
+            document.getElementById('ai-output').innerHTML = data.ai_plan;
 
             // 7. Show Results
             results.classList.remove('hidden');
@@ -73,17 +58,7 @@ if (fitnessForm) fitnessForm.addEventListener('submit', async function(e) {
 
     } catch (error) {
         console.error(error);
-        const message = error.message || 'Please refresh and try again.';
-        let visibleError = document.getElementById('generation-error');
-        if (!visibleError) {
-            visibleError = document.createElement('div');
-            visibleError.id = 'generation-error';
-            visibleError.setAttribute('role', 'alert');
-            visibleError.style.cssText = 'margin:16px 0;padding:14px 16px;border:1px solid #fecaca;border-radius:10px;background:#fef2f2;color:#991b1b;white-space:normal;';
-            document.getElementById('fitnessForm').insertAdjacentElement('afterend', visibleError);
-        }
-        visibleError.textContent = 'Could not generate your plan: ' + message;
-        console.error('Fitness plan generation failed:', error);
+        alert('Could not connect to the application. Please refresh and try again.');
     } finally {
         loader.classList.add('hidden');
         btn.disabled = false;
@@ -98,108 +73,198 @@ if (fitnessForm) fitnessForm.addEventListener('submit', async function(e) {
    TRUE PDF GENERATION (Matches New Python Logic)
    ========================================= */
 function downloadPDF() {
-    if (typeof window.html2pdf !== "function") {
-        alert("PDF library did not load. Please refresh the page and try again.");
+    // Check if jsPDF is loaded
+    if (!window.jspdf) {
+        alert("PDF Library not loaded. Please refresh the page.");
         return;
     }
 
-    const source = document.getElementById("print-area");
-    if (!source) {
-        alert("There is no fitness plan to export yet.");
-        return;
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    
+    // 1. HELPER: GET SCREEN DATA
+    const bmi = document.getElementById('res-bmi').innerText;
+    const category = document.getElementById('res-category').innerText;
+    const planType = document.getElementById('res-plan-type').innerText;
+    
+    // 2. HEADER SECTION
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(22);
+    doc.setTextColor(79, 70, 229); // Primary Purple (#4f46e5)
+    doc.text("Elite Fitness & Nutrition Plan", 105, 20, null, null, "center");
+    
+    // Stats Box
+    doc.setDrawColor(79, 70, 229);
+    doc.setFillColor(238, 242, 255); // Light Purple bg
+    doc.rect(14, 30, 182, 12, "FD"); // Filled & Stroked
+    
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    const statsText = `BMI: ${bmi}   |   Category: ${category}   |   Focus: ${planType}`;
+    doc.text(statsText, 105, 37, null, null, "center");
+
+    let finalY = 55; // Track vertical cursor position
+
+    // 3. PARSE AI HTML CONTENT
+    // We create a temporary invisible div to parse the HTML string easily
+    const aiContainer = document.createElement('div');
+    aiContainer.innerHTML = document.getElementById('ai-output').innerHTML;
+
+    // ============================================
+    // A. WORKOUT PROTOCOL (New Parsing Logic)
+    // ============================================
+    doc.setFontSize(16);
+    doc.setTextColor(79, 70, 229);
+    doc.setFont("helvetica", "bold");
+    doc.text("Weekly Workout Protocol", 14, finalY);
+    finalY += 10;
+
+    doc.setFontSize(10);
+    doc.setTextColor(50, 50, 50);
+    doc.setFont("helvetica", "normal");
+
+    // TARGET: Divs with specific padding used in your python code (padding:18px)
+    const workoutCards = aiContainer.querySelectorAll('div[style*="padding:18px"]');
+
+    if (workoutCards.length > 0) {
+        workoutCards.forEach((card) => {
+            // Page Break Check
+            if (finalY > 250) { doc.addPage(); finalY = 20; }
+
+            // 1. Extract Header (Day & Purpose)
+            const titleEl = card.querySelector('strong');
+            const titleText = titleEl ? titleEl.innerText : "Workout Day";
+
+            // 2. Extract Body Details (Paragraphs)
+            // We loop through P tags to get Warmup, Main, Cool-down, Duration
+            let detailsText = "";
+            card.querySelectorAll('p').forEach(p => {
+                // formatting clean up: remove bold tags, keep text
+                detailsText += "• " + p.innerText.replace(/\n/g, " ") + "\n";
+            });
+
+            // 3. Extract Coaching Cue (The green box)
+            const cueEl = card.querySelector('div[style*="border-left:4px solid"]');
+            let cueText = cueEl ? cueEl.innerText.replace("💡", "").trim() : "";
+            
+            // --- DRAWING ---
+            
+            // Draw Title
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(0, 0, 0); // Black for title
+            doc.text(titleText, 14, finalY);
+            finalY += 6;
+
+            // Draw Details
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(60, 60, 60); // Dark Gray for text
+            const splitDetails = doc.splitTextToSize(detailsText, 170);
+            doc.text(splitDetails, 18, finalY);
+            finalY += (splitDetails.length * 5) + 2;
+
+            // Draw Cue (if exists)
+            if (cueText) {
+                doc.setFont("helvetica", "italic");
+                doc.setTextColor(16, 185, 129); // Green (#10b981) for cue
+                const splitCue = doc.splitTextToSize(`Coach Cue: ${cueText}`, 170);
+                doc.text(splitCue, 18, finalY);
+                finalY += (splitCue.length * 5);
+            }
+
+            finalY += 8; // Spacing between cards
+        });
+    } else {
+        doc.text("No workout data found.", 14, finalY);
+        finalY += 10;
+    }
+    
+    finalY += 5;
+
+    // ============================================
+    // B. NUTRITION TABLE
+    // ============================================
+    // This logic remains robust as tables are standard
+    const tableHeaders = [];
+    aiContainer.querySelectorAll('table th').forEach(th => tableHeaders.push(th.innerText));
+
+    const tableRows = [];
+    aiContainer.querySelectorAll('table tbody tr').forEach(tr => {
+        const rowData = [];
+        tr.querySelectorAll('td').forEach(td => rowData.push(td.innerText));
+        tableRows.push(rowData);
+    });
+
+    if (tableHeaders.length > 0) {
+        if (finalY > 220) { doc.addPage(); finalY = 20; }
+        
+        doc.autoTable({
+            startY: finalY,
+            head: [tableHeaders],
+            body: tableRows,
+            theme: 'grid',
+            headStyles: { fillColor: [79, 70, 229], textColor: 255, fontStyle: 'bold' },
+            styles: { fontSize: 8, cellPadding: 4 },
+            alternateRowStyles: { fillColor: [249, 250, 251] }
+        });
+        
+        finalY = doc.lastAutoTable.finalY + 15;
     }
 
-    // Export a clean, isolated copy so the PDF has its own predictable layout
-    // and does not inherit screen-only controls or responsive overflow.
-    const wrapper = document.createElement("div");
-    wrapper.className = "pdf-export";
-    wrapper.style.width = "190mm";
-    wrapper.style.padding = "8mm";
-    wrapper.style.background = "#ffffff";
-    wrapper.style.color = "#1f2937";
-    wrapper.style.fontFamily = "Arial, Helvetica, sans-serif";
-    wrapper.style.fontSize = "10pt";
-    wrapper.style.lineHeight = "1.45";
+    // ============================================
+    // C. MINDSET & HABITS (New Parsing Logic)
+    // ============================================
+    if (finalY > 250) { doc.addPage(); finalY = 20; }
 
-    const clone = source.cloneNode(true);
-    clone.style.width = "100%";
-    clone.style.maxWidth = "none";
-    clone.style.margin = "0";
-    clone.style.padding = "0";
-    clone.style.boxShadow = "none";
-    clone.style.border = "0";
+    doc.setFontSize(16);
+    doc.setTextColor(79, 70, 229);
+    doc.setFont("helvetica", "bold");
+    doc.text("Daily Mindset & Habits", 14, finalY);
+    finalY += 10;
 
-    // Remove controls and hidden helpers from the exported copy.
-    clone.querySelectorAll(".action-buttons, button, form, .pdf-footer").forEach(el => el.remove());
+    // TARGET: Divs with the specific amber top border (border-top:5px solid #f59e0b)
+    const mindsetCards = aiContainer.querySelectorAll('div[style*="border-top:5px solid #f59e0b"]');
 
-    // Avoid clipped nutrition columns in the PDF.
-    clone.querySelectorAll("div[style*='overflow-x']").forEach(el => {
-        el.style.overflow = "visible";
-        el.style.width = "100%";
-        el.style.border = "0";
-    });
-    clone.querySelectorAll("table").forEach(table => {
-        table.style.width = "100%";
-        table.style.minWidth = "0";
-        table.style.tableLayout = "fixed";
-        table.style.fontSize = "8pt";
-        table.style.borderCollapse = "collapse";
-    });
-    clone.querySelectorAll("th, td").forEach(cell => {
-        cell.style.padding = "6px";
-        cell.style.whiteSpace = "normal";
-        cell.style.overflowWrap = "anywhere";
-        cell.style.wordBreak = "normal";
-        cell.style.verticalAlign = "top";
-    });
-    clone.querySelectorAll("tr").forEach(row => {
-        row.style.breakInside = "avoid";
-        row.style.pageBreakInside = "avoid";
-    });
+    if (mindsetCards.length > 0) {
+        doc.setFontSize(10);
+        
+        mindsetCards.forEach((card) => {
+            if (finalY > 270) { doc.addPage(); finalY = 20; }
 
-    // Keep workout and coaching cards together when possible.
-    clone.querySelectorAll("div[style*='padding:18px'], div[style*='border-top:5px']").forEach(card => {
-        card.style.breakInside = "avoid";
-        card.style.pageBreakInside = "avoid";
-        card.style.boxShadow = "none";
-        card.style.transform = "none";
-        card.style.marginBottom = "12px";
-    });
+            // 1. Extract Day
+            const dayEl = card.querySelector('strong');
+            // Clean emojis if present (like 🎯)
+            const dayText = dayEl ? dayEl.innerText.replace(/🎯/g, "").trim() : "Day";
 
-    // Normalize malformed duration strings from model output for readability.
-    clone.querySelectorAll("p").forEach(p => {
-        p.innerHTML = p.innerHTML
-            .replace(/Duration:\\s*["']?H?\\s*(\\d+)\\s*\\/?\\s*(?:min(?:ute)?s?)["']?/gi, "Duration: $1 minutes")
-            .replace(/(\\d+)\\s*\\/sec\\b/gi, "$1 seconds")
-            .replace(/(\\d+)\\s*\\/min\\b/gi, "$1 minutes")
-            .replace(/(\\d+)\\s*\\/rep\\b/gi, "$1 reps");
-    });
+            // 2. Extract Quote
+            const quoteEl = card.querySelector('p');
+            const quoteText = quoteEl ? quoteEl.innerText.replace(/["“”]/g, "") : "";
 
-    wrapper.appendChild(clone);
-    document.body.appendChild(wrapper);
+            // --- DRAWING ---
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(180, 83, 9); // Amber/Brown color for Day title
+            doc.text(dayText, 14, finalY);
+            
+            // Quote content
+            doc.setFont("helvetica", "italic");
+            doc.setTextColor(50, 50, 50); // Dark Gray
+            const splitQuote = doc.splitTextToSize(`"${quoteText}"`, 140);
+            doc.text(splitQuote, 40, finalY); // Indented
 
-    const options = {
-        margin: [8, 8, 12, 8],
-        filename: "Elite_Fitness_Plan.pdf",
-        image: { type: "jpeg", quality: 0.98 },
-        html2canvas: {
-            scale: 2,
-            useCORS: true,
-            backgroundColor: "#ffffff",
-            scrollX: 0,
-            scrollY: 0,
-            windowWidth: 1000
-        },
-        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-        pagebreak: { mode: ["css", "legacy"], avoid: [".stat-box", "tr", "h2", "h3"] }
-    };
+            finalY += (splitQuote.length * 5) + 6;
+        });
+    }
 
-    window.html2pdf().set(options).from(wrapper).save()
-        .catch(error => {
-            console.error("PDF export failed:", error);
-            alert("Could not create the PDF. Please try again.");
-        })
-        .finally(() => wrapper.remove());
+    // 4. FOOTER
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`Page ${i} of ${pageCount} - Generated by AI Personal Trainer`, 105, 290, null, null, "center");
+    }
+
+    // 5. SAVE
+    doc.save("Elite_Fitness_Plan.pdf");
 }
 
 /* =========================================
