@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Fitness Planner</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="/style.css?v=4">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
@@ -18,7 +18,7 @@
         </header>
 
         <div class="card input-section">
-            <form id="fitnessForm">
+            <form id="fitnessForm" action="/generate-plan" method="post" onsubmit="event.preventDefault();">
                 <div class="grid-row">
                     <div class="input-group">
                         <label>Age</label>
@@ -125,6 +125,6 @@
 
     </div>
 
-    <script src="script.js"></script>
+    <script src="/script.js?v=4" defer></script>
 </body>
 </html>
