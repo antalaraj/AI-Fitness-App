@@ -6,9 +6,12 @@ if (fitnessForm) fitnessForm.addEventListener('submit', async function(e) {
     const loader = document.getElementById('loader');
     const results = document.getElementById('results');
     const btn = document.getElementById('generateBtn');
+    const aiOutput = document.getElementById('ai-output');
+    const errorBox = document.getElementById('generation-error');
 
     // 2. Reset UI
     results.classList.add('hidden');
+    if (errorBox) errorBox.remove();
     loader.classList.remove('hidden');
     btn.disabled = true;
 
@@ -53,7 +56,14 @@ if (fitnessForm) fitnessForm.addEventListener('submit', async function(e) {
 
             // 6. INJECT HTML (No Markdown parsing needed anymore!)
             // The backend now sends a perfect HTML string with tables already built.
-            document.getElementById('ai-output').innerHTML = data.ai_plan;
+            if (typeof data.ai_plan !== 'string' || !data.ai_plan.trim()) {
+                throw new Error('The AI service returned an empty plan. Please try again.');
+            }
+            if (/Error generating personalized plan|plan could not be generated/i.test(data.ai_plan)) {
+                const message = data.ai_plan.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+                throw new Error(message || 'The AI service could not generate a plan.');
+            }
+            aiOutput.innerHTML = data.ai_plan;
 
             // 7. Show Results
             results.classList.remove('hidden');
@@ -63,7 +73,17 @@ if (fitnessForm) fitnessForm.addEventListener('submit', async function(e) {
 
     } catch (error) {
         console.error(error);
-        alert('Could not generate your plan: ' + (error.message || 'Please refresh and try again.'));
+        const message = error.message || 'Please refresh and try again.';
+        let visibleError = document.getElementById('generation-error');
+        if (!visibleError) {
+            visibleError = document.createElement('div');
+            visibleError.id = 'generation-error';
+            visibleError.setAttribute('role', 'alert');
+            visibleError.style.cssText = 'margin:16px 0;padding:14px 16px;border:1px solid #fecaca;border-radius:10px;background:#fef2f2;color:#991b1b;white-space:normal;';
+            document.getElementById('fitnessForm').insertAdjacentElement('afterend', visibleError);
+        }
+        visibleError.textContent = 'Could not generate your plan: ' + message;
+        console.error('Fitness plan generation failed:', error);
     } finally {
         loader.classList.add('hidden');
         btn.disabled = false;
