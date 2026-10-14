@@ -25,7 +25,7 @@ document.getElementById('fitnessForm').addEventListener('submit', async function
 
     try {
         // 4. Send to Backend (Now returns Clean HTML)
-        const response = await fetch('http://127.0.0.1:4500/generate-plan', {
+        const response = await fetch('/generate-plan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(formData)
@@ -58,7 +58,7 @@ document.getElementById('fitnessForm').addEventListener('submit', async function
 
     } catch (error) {
         console.error(error);
-        alert('Server connection failed. Please ensure "python app.py" is running.');
+        alert('Could not connect to the application. Please refresh and try again.');
     } finally {
         loader.classList.add('hidden');
         btn.disabled = false;

@@ -9,10 +9,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-if not GROQ_API_KEY:
-    raise EnvironmentError("❌ GROQ_API_KEY not found in environment variables.")
-
-client = Groq(api_key=GROQ_API_KEY)
 
 
 # --------------------------------------------------
@@ -142,6 +138,10 @@ def generate_ai_plan(user_profile):
         # --------------------------------------------------
         # Groq API Call
         # --------------------------------------------------
+        if not GROQ_API_KEY:
+            raise EnvironmentError("GROQ_API_KEY is not configured. Add it in Vercel Project Settings → Environment Variables.")
+
+        client = Groq(api_key=GROQ_API_KEY)
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[

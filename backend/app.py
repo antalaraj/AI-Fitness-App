@@ -1,63 +1,90 @@
-from flask import Flask, request, jsonify
+from pathlib import Path
+
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-# Ensure 'groq_ai.py' is in the same folder
-from groq_ai import generate_ai_plan
+
+try:
+    # Package import used by the Vercel root entry point.
+    from .groq_ai import generate_ai_plan
+except ImportError:
+    # Also supports running this file directly from the backend directory.
+    from groq_ai import generate_ai_plan
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+FRONTEND_DIR = ROOT_DIR / "frontend"
 
 app = Flask(__name__)
 CORS(app)
 
-@app.route('/')
-def home():
-    return "✅ Server is running! Open frontend/index.html in your browser."
 
-@app.route('/generate-plan', methods=['POST'])
+@app.route("/")
+def home():
+    """Serve the actual web application homepage."""
+    return send_from_directory(FRONTEND_DIR, "index.html")
+
+
+@app.route("/<path:asset_path>")
+def frontend_assets(asset_path):
+    """Serve frontend files such as CSS and JavaScript."""
+    candidate = (FRONTEND_DIR / asset_path).resolve()
+    if not candidate.is_relative_to(FRONTEND_DIR.resolve()) or not candidate.is_file():
+        return jsonify({"status": "error", "message": "Not found"}), 404
+    return send_from_directory(FRONTEND_DIR, asset_path)
+
+
+@app.route("/generate-plan", methods=["POST"])
 def generate_plan():
     try:
-        data = request.json
-        
-        # 1. Safety BMI Calculation
-        try:
-            h = float(data.get('height')) / 100
-            w = float(data.get('weight'))
-            bmi = round(w / (h * h), 2)
-            
-            if bmi < 18.5: cat = "Underweight"
-            elif bmi < 25: cat = "Normal Weight"
-            elif bmi < 30: cat = "Overweight"
-            else: cat = "Obese"
-        except:
-            bmi = "--"
-            cat = "--"
+        data = request.get_json(silent=True)
+        if not isinstance(data, dict):
+            return jsonify({"status": "error", "message": "Please submit valid JSON data."}), 400
 
-        # 2. Prepare Profile for AI
+        try:
+            height_cm = float(data.get("height", 0))
+            weight_kg = float(data.get("weight", 0))
+            if height_cm <= 0 or weight_kg <= 0:
+                raise ValueError("Height and weight must be positive.")
+            height_m = height_cm / 100
+            bmi = round(weight_kg / (height_m * height_m), 2)
+            if bmi < 18.5:
+                category = "Underweight"
+            elif bmi < 25:
+                category = "Normal Weight"
+            elif bmi < 30:
+                category = "Overweight"
+            else:
+                category = "Obese"
+        except (TypeError, ValueError, ZeroDivisionError):
+            return jsonify({"status": "error", "message": "Enter a valid positive height and weight."}), 400
+
         user_profile = {
-            "age": data.get('age'),
-            "gender": data.get('gender'),
-            "height": data.get('height'),
-            "weight": data.get('weight'),
+            "age": data.get("age"),
+            "gender": data.get("gender"),
+            "height": data.get("height"),
+            "weight": data.get("weight"),
             "bmi": bmi,
-            "bmi_category": cat,
-            "goal": data.get('goal'),
-            "activity": data.get('activity'),
-            "diet": data.get('diet'),
-            "conditions": data.get('conditions')
+            "bmi_category": category,
+            "goal": data.get("goal"),
+            "activity": data.get("activity"),
+            "diet": data.get("diet"),
+            "conditions": data.get("conditions"),
         }
 
-        # 3. Get AI Response
         ai_response = generate_ai_plan(user_profile)
-
         return jsonify({
             "status": "success",
             "bmi": bmi,
-            "bmi_category": cat,
+            "bmi_category": category,
             "plan_type": f"{data.get('goal')} Focus",
-            "ai_plan": ai_response
+            "ai_plan": ai_response,
         })
+    except Exception:
+        app.logger.exception("Failed to generate a fitness plan")
+        return jsonify({
+            "status": "error",
+            "message": "The plan could not be generated. Check the server configuration and try again.",
+        }), 500
 
-    except Exception as e:
-        print(f"Server Error: {e}")
-        return jsonify({"status": "error", "message": str(e)}), 500
 
-if __name__ == '__main__':
-    # Runs on Port 4500
-    app.run(debug=True, port=4500)
+if __name__ == "__main__":
+    app.run(debug=False, port=4500)
