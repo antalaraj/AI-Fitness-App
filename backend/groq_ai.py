@@ -9,6 +9,9 @@ from dotenv import load_dotenv
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+# Groq retired llama-3.3-70b-versatile for developer-tier usage.
+# Keep the model configurable in Vercel; GPT-OSS 120B is the current replacement.
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 
 
 # --------------------------------------------------
@@ -143,7 +146,7 @@ def generate_ai_plan(user_profile):
 
         client = Groq(api_key=GROQ_API_KEY)
         completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model=GROQ_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt}
