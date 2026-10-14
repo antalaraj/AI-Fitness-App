@@ -2,6 +2,10 @@
 
 Smart, Safe, and Personalised Fitness Planning System using Generative AI.
 
+## 🌐 Live Demo
+
+**Try the application here:** https://ai-fitness-planner-app.vercel.app/
+
 ## Overview
 AI Fitness Planner App is a full-stack web application that uses Generative Artificial Intelligence to create personalised workout, diet, and mindset plans based on user-specific data. Unlike traditional fitness applications that rely on static templates, this system dynamically generates intelligent fitness guidance using large language models combined with health-based rule logic.
 
@@ -32,7 +36,7 @@ The application analyses user attributes such as age, height, weight, fitness go
 
 ### AI & Tools
 - Groq API  
-- LLaMA 3.3 (70B)  
+- Groq-hosted language model  
 - jsPDF  
 - xhtml2pdf  
 
@@ -43,7 +47,7 @@ The application analyses user attributes such as age, height, weight, fitness go
 2. System calculates BMI and performs safety checks  
 3. AI model generates workout, diet, and mindset plan  
 4. Results displayed on web interface  
-5. User can download professional PDF report  
+5. User can download a PDF report  
 
 ---
 
@@ -58,7 +62,7 @@ cd AI-Fitness-App
 ### 2. Create virtual environment (optional)
 ```bash
 python -m venv venv
-venv\Scripts\activate
+venv\\Scripts\\activate
 ```
 
 ### 3. Install dependencies
