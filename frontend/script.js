@@ -1,4 +1,5 @@
-document.getElementById('fitnessForm').addEventListener('submit', async function(e) {
+const fitnessForm = document.getElementById('fitnessForm');
+if (fitnessForm) fitnessForm.addEventListener('submit', async function(e) {
     e.preventDefault();
 
     // 1. UI References
@@ -33,6 +34,10 @@ document.getElementById('fitnessForm').addEventListener('submit', async function
 
         const data = await response.json();
 
+        if (!response.ok || data.status !== 'success') {
+            throw new Error(data.message || data.error || `Request failed (${response.status})`);
+        }
+
         if (data.status === 'success') {
             // 5. Populate Stats
             document.getElementById('res-bmi').innerText = data.bmi;
@@ -58,7 +63,7 @@ document.getElementById('fitnessForm').addEventListener('submit', async function
 
     } catch (error) {
         console.error(error);
-        alert('Could not connect to the application. Please refresh and try again.');
+        alert('Could not generate your plan: ' + (error.message || 'Please refresh and try again.'));
     } finally {
         loader.classList.add('hidden');
         btn.disabled = false;
